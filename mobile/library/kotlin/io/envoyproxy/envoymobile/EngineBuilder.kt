@@ -56,7 +56,6 @@ open class EngineBuilder(
   private var dnsCacheSaveIntervalSeconds = 1
   private var enableDrainPostDnsRefresh = false
   internal var enableHttp3 = true
-  private var enableHappyEyeballs = true
   private var enableGzipDecompression = true
   private var enableBrotliDecompression = false
   private var enableSocketTagging = false
@@ -70,7 +69,6 @@ open class EngineBuilder(
   private var appVersion = "unspecified"
   private var appId = "unspecified"
   private var trustChainVerification = TrustChainVerification.VERIFY_TRUST_CHAIN
-  private var virtualClusters = mutableListOf<String>()
   private var platformFilterChain = mutableListOf<EnvoyHTTPFilterFactory>()
   private var nativeFilterChain = mutableListOf<EnvoyNativeFilterConfig>()
   private var stringAccessors = mutableMapOf<String, EnvoyStringAccessor>()
@@ -88,6 +86,9 @@ open class EngineBuilder(
   private var nodeRegion: String = ""
   private var nodeZone: String = ""
   private var nodeSubZone: String = ""
+  private var cdsResourcesLocator: String = ""
+  private var cdsTimeoutSeconds: Int = 0
+  private var enableCds: Boolean = false
 
   /**
    * Add a log level to use with Envoy.
@@ -235,19 +236,6 @@ open class EngineBuilder(
   fun enableDNSCache(enableDNSCache: Boolean, saveInterval: Int = 1): EngineBuilder {
     this.enableDNSCache = enableDNSCache
     this.dnsCacheSaveIntervalSeconds = saveInterval
-    return this
-  }
-
-  /**
-   * Specify whether to use Happy Eyeballs when multiple IP stacks may be supported. Defaults to
-   * true.
-   *
-   * @param enableHappyEyeballs whether to enable RFC 6555 handling for IPv4/IPv6.
-   *
-   * @return This builder.
-   */
-  fun enableHappyEyeballs(enableHappyEyeballs: Boolean): EngineBuilder {
-    this.enableHappyEyeballs = enableHappyEyeballs
     return this
   }
 
@@ -548,18 +536,6 @@ open class EngineBuilder(
   }
 
   /**
-   * Add virtual cluster configuration.
-   *
-   * @param cluster the JSON configuration string for a virtual cluster.
-   *
-   * @return this builder.
-   */
-  fun addVirtualCluster(cluster: String): EngineBuilder {
-    this.virtualClusters.add(cluster)
-    return this
-  }
-
-  /**
    * Sets the node.id field in the Bootstrap configuration.
    *
    * @param nodeId the node ID.
@@ -597,7 +573,8 @@ open class EngineBuilder(
   *
   * @param jwtToken the JWT token.
   *
-  * @param jwtTokenLifetimeSeconds the lifetime of the JWT token in seconds.
+  * @param jwtTokenLifetimeSeconds the lifetime of the JWT token. If zero,
+  *                                a default value is set in engine_builder.h.
   *
   * @param sslRootCerts the SSL root certificates.
   *
@@ -619,11 +596,34 @@ open class EngineBuilder(
   }
 
   /**
+  * Adds a CDS layer.
+  *
+  * @param resourcesLocator The xdstp resource URI for fetching clusters.
+  *                         If empty, xdstp is not used and a wildcard is inferred.
+  *
+  * @param timeoutSeconds The timeout in seconds. If zero, a default value is
+  *                       set in engine_builder.h.
+  *
+  * @return this builder.
+  */
+  fun addCdsLayer(
+    resourcesLocator: String = "",
+    timeoutSeconds: Int = 0,
+  ): EngineBuilder {
+    this.cdsResourcesLocator = resourcesLocator
+    this.cdsTimeoutSeconds = timeoutSeconds
+    this.enableCds = true
+    return this
+  }
+
+
+  /**
   * Adds an RTDS layer to default config. Requires that ADS be configured.
   *
   * @param layerName the layer name.
   *
-  * @param timeoutSeconds the timeout.
+  * @param timeoutSeconds The timeout in seconds. If zero, a default value is
+  *                       set in engine_builder.h.
   *
   * @return this builder.
   */
@@ -670,7 +670,6 @@ open class EngineBuilder(
       enableGzipDecompression,
       enableBrotliDecompression,
       enableSocketTagging,
-      enableHappyEyeballs,
       enableInterfaceBinding,
       h2ConnectionKeepaliveIdleIntervalMilliseconds,
       h2ConnectionKeepaliveTimeoutSeconds,
@@ -681,7 +680,6 @@ open class EngineBuilder(
       appVersion,
       appId,
       trustChainVerification,
-      virtualClusters,
       nativeFilterChain,
       platformFilterChain,
       stringAccessors,
@@ -701,6 +699,9 @@ open class EngineBuilder(
       nodeRegion,
       nodeZone,
       nodeSubZone,
+      cdsResourcesLocator,
+      cdsTimeoutSeconds,
+      enableCds,
     )
 
 
