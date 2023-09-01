@@ -282,8 +282,9 @@ public:
   }
 
   Buffer::OwnedImpl
-  encodeCreateRequest(const std::string& path, const std::string& data, const CreateFlags flags,
-                      const bool txn = false, const int32_t xid = 1000,
+  encodeCreateRequest(const std::string& path, const std::string& data,
+                      const int32_t create_flag_val, const bool txn = false,
+                      const int32_t xid = 1000,
                       const int32_t opcode = enumToSignedInt(OpCodes::Create)) const {
     Buffer::OwnedImpl buffer;
 
@@ -300,13 +301,13 @@ public:
     // Acls.
     buffer.writeBEInt<int32_t>(0);
     // Flags.
-    buffer.writeBEInt<int32_t>(static_cast<int32_t>(flags));
+    buffer.writeBEInt<int32_t>(create_flag_val);
 
     return buffer;
   }
 
   Buffer::OwnedImpl encodeCreateRequestWithNegativeDataLen(
-      const std::string& path, const CreateFlags flags, const bool txn = false,
+      const std::string& path, const int32_t create_flag_val, const bool txn = false,
       const int32_t opcode = enumToSignedInt(OpCodes::Create)) const {
     Buffer::OwnedImpl buffer;
 
@@ -323,7 +324,7 @@ public:
     // Acls.
     buffer.writeBEInt<int32_t>(0);
     // Flags.
-    buffer.writeBEInt<int32_t>(static_cast<int32_t>(flags));
+    buffer.writeBEInt<int32_t>(create_flag_val);
 
     return buffer;
   }
@@ -538,10 +539,11 @@ public:
     }
   }
 
-  void testCreate(CreateFlags flags, const OpCodes opcode = OpCodes::Create) {
+  void testCreate(const CreateFlags flag, const int32_t flag_val,
+                  const OpCodes opcode = OpCodes::Create) {
     initialize();
     Buffer::OwnedImpl data =
-        encodeCreateRequest("/foo", "bar", flags, false, 1000, enumToSignedInt(opcode));
+        encodeCreateRequest("/foo", "bar", flag_val, false, 1000, enumToSignedInt(opcode));
     std::string opname = "create";
 
     switch (opcode) {
@@ -556,7 +558,7 @@ public:
     }
 
     expectSetDynamicMetadata(
-        {{{"opname", opname}, {"path", "/foo"}, {"create_type", createFlagsToString(flags)}},
+        {{{"opname", opname}, {"path", "/foo"}, {"create_type", createFlagsToString(flag)}},
          {{"bytes", "35"}}});
 
     EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
@@ -579,10 +581,11 @@ public:
     EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
   }
 
-  void testCreateWithNegativeDataLen(CreateFlags flags, const OpCodes opcode = OpCodes::Create) {
+  void testCreateWithNegativeDataLen(CreateFlags flag, const int32_t flag_val,
+                                     const OpCodes opcode = OpCodes::Create) {
     initialize();
     Buffer::OwnedImpl data =
-        encodeCreateRequestWithNegativeDataLen("/foo", flags, false, enumToSignedInt(opcode));
+        encodeCreateRequestWithNegativeDataLen("/foo", flag_val, false, enumToSignedInt(opcode));
     std::string opname = "create";
 
     switch (opcode) {
@@ -597,7 +600,7 @@ public:
     }
 
     expectSetDynamicMetadata(
-        {{{"opname", opname}, {"path", "/foo"}, {"create_type", createFlagsToString(flags)}},
+        {{{"opname", opname}, {"path", "/foo"}, {"create_type", createFlagsToString(flag)}},
          {{"bytes", "32"}}});
 
     EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
@@ -914,42 +917,42 @@ TEST_F(ZooKeeperFilterTest, GetDataRequestEmptyPath) {
 }
 
 TEST_F(ZooKeeperFilterTest, CreateRequestPersistent) {
-  testCreate(CreateFlags::Persistent);
+  testCreate(CreateFlags::Persistent, 0);
   testResponse({{{"opname", "create_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
                config_->stats().create_resp_, config_->stats().create_resp_fast_,
                config_->stats().create_resp_slow_);
 }
 
 TEST_F(ZooKeeperFilterTest, CreateRequestPersistentWithNegativeDataLen) {
-  testCreateWithNegativeDataLen(CreateFlags::Persistent);
+  testCreateWithNegativeDataLen(CreateFlags::Persistent, 0);
   testResponse({{{"opname", "create_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
                config_->stats().create_resp_, config_->stats().create_resp_fast_,
                config_->stats().create_resp_slow_);
 }
 
 TEST_F(ZooKeeperFilterTest, CreateRequestPersistentSequential) {
-  testCreate(CreateFlags::PersistentSequential);
+  testCreate(CreateFlags::PersistentSequential, 2);
   testResponse({{{"opname", "create_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
                config_->stats().create_resp_, config_->stats().create_resp_fast_,
                config_->stats().create_resp_slow_);
 }
 
 TEST_F(ZooKeeperFilterTest, CreateRequestEphemeral) {
-  testCreate(CreateFlags::Ephemeral);
+  testCreate(CreateFlags::Ephemeral, 1);
   testResponse({{{"opname", "create_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
                config_->stats().create_resp_, config_->stats().create_resp_fast_,
                config_->stats().create_resp_slow_);
 }
 
 TEST_F(ZooKeeperFilterTest, CreateRequestEphemeralSequential) {
-  testCreate(CreateFlags::EphemeralSequential);
+  testCreate(CreateFlags::EphemeralSequential, 3);
   testResponse({{{"opname", "create_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
                config_->stats().create_resp_, config_->stats().create_resp_fast_,
                config_->stats().create_resp_slow_);
 }
 
 TEST_F(ZooKeeperFilterTest, CreateRequestContainer) {
-  testCreate(CreateFlags::Container, OpCodes::CreateContainer);
+  testCreate(CreateFlags::Container, 4, OpCodes::CreateContainer);
   testResponse(
       {{{"opname", "createcontainer_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
       config_->stats().createcontainer_resp_, config_->stats().createcontainer_resp_fast_,
@@ -957,7 +960,7 @@ TEST_F(ZooKeeperFilterTest, CreateRequestContainer) {
 }
 
 TEST_F(ZooKeeperFilterTest, CreateRequestTTL) {
-  testCreate(CreateFlags::PersistentWithTtl, OpCodes::CreateTtl);
+  testCreate(CreateFlags::PersistentWithTtl, 5, OpCodes::CreateTtl);
   testResponse(
       {{{"opname", "createttl_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
       config_->stats().createttl_resp_, config_->stats().createttl_resp_fast_,
@@ -965,7 +968,7 @@ TEST_F(ZooKeeperFilterTest, CreateRequestTTL) {
 }
 
 TEST_F(ZooKeeperFilterTest, CreateRequestTTLSequential) {
-  testCreate(CreateFlags::PersistentSequentialWithTtl, OpCodes::CreateTtl);
+  testCreate(CreateFlags::PersistentSequentialWithTtl, 6, OpCodes::CreateTtl);
   testResponse(
       {{{"opname", "createttl_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
       config_->stats().createttl_resp_, config_->stats().createttl_resp_fast_,
@@ -975,8 +978,8 @@ TEST_F(ZooKeeperFilterTest, CreateRequestTTLSequential) {
 TEST_F(ZooKeeperFilterTest, CreateRequest2) {
   initialize();
 
-  Buffer::OwnedImpl data = encodeCreateRequest("/foo", "bar", CreateFlags::Persistent, false, 1000,
-                                               enumToSignedInt(OpCodes::Create2));
+  Buffer::OwnedImpl data =
+      encodeCreateRequest("/foo", "bar", 0, false, 1000, enumToSignedInt(OpCodes::Create2));
 
   testRequest(
       data,
@@ -1139,10 +1142,9 @@ TEST_F(ZooKeeperFilterTest, CheckRequest) {
 TEST_F(ZooKeeperFilterTest, MultiRequest) {
   initialize();
 
-  Buffer::OwnedImpl create1 = encodeCreateRequest("/foo", "1", CreateFlags::Persistent, true);
-  Buffer::OwnedImpl create2 = encodeCreateRequest("/bar", "1", CreateFlags::Persistent, true);
-  Buffer::OwnedImpl create3 =
-      encodeCreateRequestWithNegativeDataLen("/baz", CreateFlags::Persistent, true);
+  Buffer::OwnedImpl create1 = encodeCreateRequest("/foo", "1", 0, true);
+  Buffer::OwnedImpl create2 = encodeCreateRequest("/bar", "1", 0, true);
+  Buffer::OwnedImpl create3 = encodeCreateRequestWithNegativeDataLen("/baz", 0, true);
   Buffer::OwnedImpl check1 = encodePathVersion("/foo", 100, enumToSignedInt(OpCodes::Check), true);
   Buffer::OwnedImpl set1 = encodeSetRequest("/bar", "2", -1, true);
   Buffer::OwnedImpl delete1 = encodeDeleteRequest("/abcd", 1, true);
@@ -1238,6 +1240,20 @@ TEST_F(ZooKeeperFilterTest, SetWatches2Request) {
       {{{"opname", "setwatches2_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
       config_->stats().setwatches2_resp_, config_->stats().setwatches2_resp_fast_,
       config_->stats().setwatches2_resp_slow_);
+}
+
+TEST_F(ZooKeeperFilterTest, AddWatchRequest) {
+  initialize();
+
+  Buffer::OwnedImpl data =
+      encodePathVersion("/foo", enumToSignedInt(AddWatchMode::PersistentRecursive),
+                        enumToSignedInt(OpCodes::AddWatch));
+
+  testRequest(data, {{{"opname", "addwatch"}, {"path", "/foo"}, {"mode", "1"}}, {{"bytes", "24"}}},
+              config_->stats().addwatch_rq_, 24);
+  testResponse({{{"opname", "addwatch_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
+               config_->stats().addwatch_resp_, config_->stats().addwatch_resp_fast_,
+               config_->stats().addwatch_resp_slow_);
 }
 
 TEST_F(ZooKeeperFilterTest, CheckWatchesRequest) {
@@ -1348,10 +1364,9 @@ TEST_F(ZooKeeperFilterTest, MultipleRequestsWithOneOnDataCall) {
   initialize();
 
   // Request (onData1).
-  Buffer::OwnedImpl data = encodeCreateRequest("/foo", "bar", CreateFlags::Persistent, false, 1000,
-                                               enumToSignedInt(OpCodes::Create));
-  data.add(encodeCreateRequest("/baz", "abcd", CreateFlags::Persistent, false, 1001,
-                               enumToSignedInt(OpCodes::Create)));
+  Buffer::OwnedImpl data =
+      encodeCreateRequest("/foo", "bar", 0, false, 1000, enumToSignedInt(OpCodes::Create));
+  data.add(encodeCreateRequest("/baz", "abcd", 0, false, 1001, enumToSignedInt(OpCodes::Create)));
 
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
   EXPECT_EQ(2UL, config_->stats().create_rq_.value());
@@ -1365,6 +1380,61 @@ TEST_F(ZooKeeperFilterTest, MultipleRequestsWithOneOnDataCall) {
   testResponse({{{"opname", "create_resp"}, {"zxid", "2001"}, {"error", "0"}}, {{"bytes", "20"}}},
                config_->stats().create_resp_, config_->stats().create_resp_fast_,
                config_->stats().create_resp_slow_, 1001, 2001, 2);
+}
+
+// |REQ1|REQ2|
+// (onData1  )
+TEST_F(ZooKeeperFilterTest, MultipleControlRequestsWithOneOnDataCall) {
+  initialize();
+
+  // Request (onData1).
+  Buffer::OwnedImpl data = encodeAuth("digest");
+  data.add(encodeAuth("digest"));
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
+  EXPECT_EQ(2UL, store_.counter("test.zookeeper.auth.digest_rq").value());
+  EXPECT_EQ(72UL, config_->stats().request_bytes_.value());
+  EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
+
+  // Responses.
+  testResponse({{{"opname", "auth_response"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
+               config_->stats().auth_resp_, config_->stats().auth_resp_fast_,
+               config_->stats().auth_resp_slow_, enumToSignedInt(XidCodes::AuthXid), 2000);
+  testResponse({{{"opname", "auth_response"}, {"zxid", "2001"}, {"error", "0"}}, {{"bytes", "20"}}},
+               config_->stats().auth_resp_, config_->stats().auth_resp_fast_,
+               config_->stats().auth_resp_slow_, enumToSignedInt(XidCodes::AuthXid), 2001, 2);
+}
+
+// |REQ1|REQ2|
+// (onData1  )
+TEST_F(ZooKeeperFilterTest, MixedControlAndDataRequestsWithOneOnDataCall) {
+  initialize();
+
+  // Request (onData1).
+  Buffer::OwnedImpl rq_data = encodeAuth("digest");
+  rq_data.add(encodeCreateRequest("/foo", "bar", 0, false, 1000, enumToSignedInt(OpCodes::Create)));
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(rq_data, false));
+  EXPECT_EQ(1UL, store_.counter("test.zookeeper.auth.digest_rq").value());
+  EXPECT_EQ(1UL, config_->stats().create_rq_.value());
+  EXPECT_EQ(71UL, config_->stats().request_bytes_.value());
+  EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
+
+  // Responses.
+  testResponse({{{"opname", "auth_response"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
+               config_->stats().auth_resp_, config_->stats().auth_resp_fast_,
+               config_->stats().auth_resp_slow_, enumToSignedInt(XidCodes::AuthXid), 2000);
+
+  Buffer::OwnedImpl resp_data = encodeResponseHeader(1000, 2001, 0);
+  expectSetDynamicMetadata(
+      {{{"opname", "create_resp"}, {"zxid", "2001"}, {"error", "0"}}, {{"bytes", "20"}}});
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onWrite(resp_data, false));
+  EXPECT_EQ(1UL, config_->stats().create_resp_.value());
+  EXPECT_EQ(1UL, config_->stats().create_resp_fast_.value());
+  EXPECT_EQ(0UL, config_->stats().create_resp_slow_.value());
+  EXPECT_EQ(40UL, config_->stats().response_bytes_.value());
+  EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
+  EXPECT_NE(absl::nullopt, findHistogram("test.zookeeper.create_resp_latency"));
 }
 
 // |REQ1 -------|REQ2 ---------|
@@ -1447,10 +1517,8 @@ TEST_F(ZooKeeperFilterTest, MultipleRequestsWithMultipleOnDataCalls2) {
   // Flags.
   data.writeBEInt<int32_t>(static_cast<int32_t>(CreateFlags::Persistent));
   // Add data of request2 and request3 to the buffer.
-  data.add(encodeCreateRequest("/baz", "abcd", CreateFlags::Persistent, false, 1001,
-                               enumToSignedInt(OpCodes::Create)));
-  data.add(encodeCreateRequest("/qux", "efghi", CreateFlags::Persistent, false, 1002,
-                               enumToSignedInt(OpCodes::Create)));
+  data.add(encodeCreateRequest("/baz", "abcd", 0, false, 1001, enumToSignedInt(OpCodes::Create)));
+  data.add(encodeCreateRequest("/qux", "efghi", 0, false, 1002, enumToSignedInt(OpCodes::Create)));
 
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
   EXPECT_EQ(3UL, config_->stats().create_rq_.value());
@@ -1475,10 +1543,9 @@ TEST_F(ZooKeeperFilterTest, MultipleRequestsWithMultipleOnDataCalls3) {
   initialize();
 
   // Request (onData1).
-  Buffer::OwnedImpl data = encodeCreateRequest("/foo", "bar", CreateFlags::Persistent, false, 1000,
-                                               enumToSignedInt(OpCodes::Create));
-  data.add(encodeCreateRequest("/baz", "abcd", CreateFlags::Persistent, false, 1001,
-                               enumToSignedInt(OpCodes::Create)));
+  Buffer::OwnedImpl data =
+      encodeCreateRequest("/foo", "bar", 0, false, 1000, enumToSignedInt(OpCodes::Create));
+  data.add(encodeCreateRequest("/baz", "abcd", 0, false, 1001, enumToSignedInt(OpCodes::Create)));
   data.add(encodeCreateRequestWithPartialData("/qux", "efghi", false, 1002,
                                               enumToSignedInt(OpCodes::Create)));
 
@@ -1519,8 +1586,8 @@ TEST_F(ZooKeeperFilterTest, MultipleRequestsWithMultipleOnDataCalls4) {
   initialize();
 
   // Request (onData1).
-  Buffer::OwnedImpl data = encodeCreateRequest("/foo", "bar", CreateFlags::Persistent, false, 1000,
-                                               enumToSignedInt(OpCodes::Create));
+  Buffer::OwnedImpl data =
+      encodeCreateRequest("/foo", "bar", 0, false, 1000, enumToSignedInt(OpCodes::Create));
   // Add partial data of request2 to the buffer.
   data.add(encodeCreateRequestWithPartialData("/bar", "abcd", false, 1001,
                                               enumToSignedInt(OpCodes::Create)));
@@ -1549,8 +1616,7 @@ TEST_F(ZooKeeperFilterTest, MultipleRequestsWithMultipleOnDataCalls4) {
   // Flags.
   data.writeBEInt<int32_t>(static_cast<int32_t>(CreateFlags::Persistent));
   // Add data of the request3 to the buffer.
-  data.add(encodeCreateRequest("/qux", "efghi", CreateFlags::Persistent, false, 1002,
-                               enumToSignedInt(OpCodes::Create)));
+  data.add(encodeCreateRequest("/qux", "efghi", 0, false, 1002, enumToSignedInt(OpCodes::Create)));
 
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
   EXPECT_EQ(3UL, config_->stats().create_rq_.value());

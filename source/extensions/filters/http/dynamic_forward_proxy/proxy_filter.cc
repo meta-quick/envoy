@@ -84,7 +84,7 @@ LoadClusterEntryHandlePtr ProxyFilterConfig::addDynamicCluster(
     std::string version_info = "";
     ENVOY_LOG(debug, "deliver dynamic cluster {} creation to main thread", cluster_name);
     main_thread_dispatcher_.post([this, cluster, version_info]() {
-      ENVOY_LOG(debug, "initilizing dynamic cluster {} creation in main thread", cluster.name());
+      ENVOY_LOG(debug, "initializing dynamic cluster {} creation in main thread", cluster.name());
       cluster_manager_.addOrUpdateCluster(cluster, version_info);
     });
   } else {
@@ -111,8 +111,8 @@ ProxyFilterConfig::ThreadLocalClusterInfo::~ThreadLocalClusterInfo() {
   }
 }
 
-void ProxyFilterConfig::onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) {
-  const std::string& cluster_name = cluster.info()->name();
+void ProxyFilterConfig::onClusterAddOrUpdate(absl::string_view cluster_name,
+                                             Upstream::ThreadLocalClusterCommand&) {
   ENVOY_LOG(debug, "thread local cluster {} added or updated", cluster_name);
   ThreadLocalClusterInfo& tls_cluster_info = *tls_slot_;
   auto it = tls_cluster_info.pending_clusters_.find(cluster_name);
@@ -223,7 +223,7 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
     // using it, which is not a good usage, will end with ServiceUnavailable.
     // Thread local cluster is existing due to the thread local cache, and the main thread notify
     // work thread is on the way.
-    ENVOY_STREAM_LOG(debug, "dynamic foward cluster is gone", *this->decoder_callbacks_);
+    ENVOY_STREAM_LOG(debug, "dynamic forward cluster is gone", *this->decoder_callbacks_);
     this->decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable,
                                              ResponseStrings::get().DFPClusterIsGone, nullptr,
                                              absl::nullopt, RcDetails::get().DFPClusterIsGone);
@@ -263,7 +263,7 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
     ASSERT(cache_load_handle_ == nullptr);
     ENVOY_STREAM_LOG(debug, "DNS cache entry already loaded, continuing", *decoder_callbacks_);
 
-    auto const& host = config_->cache().getHost(headers.Host()->value().getStringView());
+    auto const& host = result.host_info_;
     latchTime(decoder_callbacks_, DNS_END);
     if (!host.has_value() || !host.value()->address()) {
       onDnsResolutionFail();

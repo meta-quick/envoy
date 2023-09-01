@@ -22,6 +22,7 @@ envoy_cc_test(
         "//test/mocks:common_lib",
         "//test/mocks/config:config_mocks",
         "//test/mocks/config:custom_config_validators_mocks",
+        "//test/mocks/config:eds_resources_cache_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/local_info:local_info_mocks",
@@ -43,6 +44,7 @@ envoy_cc_test(
         "//envoy/config:xds_config_tracker_interface",
         "//envoy/config:xds_resources_delegate_interface",
         "//source/common/config:api_version_lib",
+        "//source/common/config:null_grpc_mux_lib",
         "//source/common/config:protobuf_link_hacks",
         "//source/common/protobuf",
         "//source/common/stats:isolated_store_lib",
@@ -51,6 +53,7 @@ envoy_cc_test(
         "//test/mocks:common_lib",
         "//test/mocks/config:config_mocks",
         "//test/mocks/config:custom_config_validators_mocks",
+        "//test/mocks/config:eds_resources_cache_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/local_info:local_info_mocks",
@@ -76,6 +79,7 @@ envoy_cc_test(
         "//source/extensions/config_subscription/grpc:grpc_subscription_lib",
         "//test/mocks:common_lib",
         "//test/mocks/config:config_mocks",
+        "//test/mocks/config:eds_resources_cache_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/local_info:local_info_mocks",
@@ -181,6 +185,7 @@ envoy_cc_test(
         "//test/mocks:common_lib",
         "//test/mocks/config:config_mocks",
         "//test/mocks/config:custom_config_validators_mocks",
+        "//test/mocks/config:eds_resources_cache_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/local_info:local_info_mocks",
@@ -193,5 +198,63 @@ envoy_cc_test(
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "grpc_stream_test",
+    srcs = ["grpc_stream_test.cc"],
+    deps = [
+        "//source/extensions/config_subscription/grpc:grpc_stream_lib",
+        "//test/common/stats:stat_test_utility_lib",
+        "//test/mocks:common_lib",
+        "//test/mocks/config:config_mocks",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/grpc:grpc_mocks",
+        "//test/test_common:logging_lib",
+        "//test/test_common:simulated_time_system_lib",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "pausable_ack_queue_test",
+    srcs = ["pausable_ack_queue_test.cc"],
+    deps = [
+        "//source/extensions/config_subscription/grpc:pausable_ack_queue_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "watch_map_test",
+    srcs = ["watch_map_test.cc"],
+    deps = [
+        "//envoy/config:xds_config_tracker_interface",
+        "//source/extensions/config_subscription/grpc:watch_map_lib",
+        "//test/mocks/config:config_mocks",
+        "//test/mocks/config:custom_config_validators_mocks",
+        "//test/mocks/config:eds_resources_cache_mocks",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "xds_source_id_test",
+    srcs = ["xds_source_id_test.cc"],
+    deps = [
+        "//source/extensions/config_subscription/grpc:xds_source_id_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "eds_resources_cache_impl_test",
+    srcs = ["eds_resources_cache_impl_test.cc"],
+    deps = [
+        "//source/extensions/config_subscription/grpc:eds_resources_cache_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
     ],
 )

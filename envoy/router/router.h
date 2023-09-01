@@ -1200,6 +1200,14 @@ public:
   virtual const RouteTracing* tracingConfig() const PURE;
 
   /**
+   * Check if the filter is disabled for this route.
+   * @param config_name supplies the name of the filter config in the HTTP filter chain. This name
+   * may be different from the filter extension qualified name.
+   * @return true if the filter is disabled for this route, false otherwise.
+   */
+  virtual bool filterDisabled(absl::string_view config_name) const PURE;
+
+  /**
    * This is a helper to get the route's per-filter config if it exists, up along the config
    * hierarchy(Route --> VirtualHost --> RouteConfiguration). Or nullptr if none of them exist.
    */
@@ -1387,6 +1395,11 @@ public:
    * @return optionally returns the host for the connection pool.
    */
   virtual Upstream::HostDescriptionConstSharedPtr host() const PURE;
+
+  /**
+   * @return returns if the connection pool was iniitalized successfully.
+   */
+  virtual bool valid() const PURE;
 };
 
 /**
@@ -1515,6 +1528,11 @@ using GenericConnPoolPtr = std::unique_ptr<GenericConnPool>;
  */
 class GenericConnPoolFactory : public Envoy::Config::TypedFactory {
 public:
+  /*
+   * Protocol used by the upstream sockets.
+   */
+  enum class UpstreamProtocol { HTTP, TCP, UDP };
+
   ~GenericConnPoolFactory() override = default;
 
   /*
@@ -1522,7 +1540,8 @@ public:
    * @return may be null
    */
   virtual GenericConnPoolPtr
-  createGenericConnPool(Upstream::ThreadLocalCluster& thread_local_cluster, bool is_connect,
+  createGenericConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
+                        GenericConnPoolFactory::UpstreamProtocol upstream_protocol,
                         const RouteEntry& route_entry,
                         absl::optional<Http::Protocol> downstream_protocol,
                         Upstream::LoadBalancerContext* ctx) const PURE;

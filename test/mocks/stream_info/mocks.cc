@@ -165,11 +165,6 @@ MockStreamInfo::MockStreamInfo()
   ON_CALL(*this, setUpstreamInfo(_))
       .WillByDefault(Invoke([this](std::shared_ptr<UpstreamInfo> info) { upstream_info_ = info; }));
   ON_CALL(*this, virtualClusterName()).WillByDefault(ReturnRef(virtual_cluster_name_));
-  ON_CALL(*this, setFilterChainName(_))
-      .WillByDefault(Invoke([this](const absl::string_view filter_chain_name) {
-        filter_chain_name_ = std::string(filter_chain_name);
-      }));
-  ON_CALL(*this, filterChainName()).WillByDefault(ReturnRef(filter_chain_name_));
   ON_CALL(*this, setAttemptCount(_)).WillByDefault(Invoke([this](uint32_t attempt_count) {
     attempt_count_ = attempt_count;
   }));
@@ -190,6 +185,11 @@ MockStreamInfo::MockStreamInfo()
       }));
   ON_CALL(*this, downstreamTransportFailureReason())
       .WillByDefault(ReturnPointee(&downstream_transport_failure_reason_));
+  ON_CALL(*this, setUpstreamClusterInfo(_))
+      .WillByDefault(Invoke([this](const Upstream::ClusterInfoConstSharedPtr& cluster_info) {
+        upstream_cluster_info_ = std::move(cluster_info);
+      }));
+  ON_CALL(*this, upstreamClusterInfo()).WillByDefault(ReturnPointee(&upstream_cluster_info_));
 }
 
 MockStreamInfo::~MockStreamInfo() = default;

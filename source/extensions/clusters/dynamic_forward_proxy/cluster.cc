@@ -6,6 +6,7 @@
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.validate.h"
 #include "envoy/router/string_accessor.h"
+#include "envoy/stream_info/uint32_accessor.h"
 
 #include "source/common/http/utility.h"
 #include "source/common/network/transport_socket_options_impl.h"
@@ -39,10 +40,6 @@ Cluster::Cluster(
       enable_sub_cluster_(config.has_sub_clusters_config()) {
 
   if (enable_sub_cluster_) {
-    if (sub_cluster_lb_policy_ ==
-        envoy::config::cluster::v3::Cluster_LbPolicy::Cluster_LbPolicy_CLUSTER_PROVIDED) {
-      throw EnvoyException("unsupported lb_policy 'CLUSTER_PROVIDED' in sub_cluster_config");
-    }
     idle_timer_ = main_thread_dispatcher_.createTimer([this]() { checkIdleSubCluster(); });
     idle_timer_->enableTimer(sub_cluster_ttl_);
   }
@@ -291,7 +288,7 @@ void Cluster::updatePriorityState(const Upstream::HostVector& hosts_added,
   }
   priority_state_manager.updateClusterPrioritySet(
       0, std::move(priority_state_manager.priorityState()[0].first), hosts_added, hosts_removed,
-      absl::nullopt, absl::nullopt);
+      absl::nullopt, absl::nullopt, absl::nullopt);
 }
 
 void Cluster::onDnsHostRemove(const std::string& host) {
@@ -322,16 +319,41 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
             .getDataReadOnly<Router::StringAccessor>("envoy.upstream.dynamic_host");
   }
 
-  absl::string_view host;
+  absl::string_view raw_host;
   if (dynamic_host_filter_state) {
-    host = dynamic_host_filter_state->asString();
+    raw_host = dynamic_host_filter_state->asString();
   } else if (context->downstreamHeaders()) {
-    host = context->downstreamHeaders()->getHostValue();
+    raw_host = context->downstreamHeaders()->getHostValue();
   } else if (context->downstreamConnection()) {
-    host = context->downstreamConnection()->requestedServerName();
+    raw_host = context->downstreamConnection()->requestedServerName();
   }
 
+  // For host lookup, we need to make sure to match the host of any DNS cache
+  // insert. Two code points currently do DNS cache insert: the http DFP filter,
+  // which inserts for HTTP traffic, and sets port based on the cluster's
+  // security level, and the SNI DFP network filter which sets port based on
+  // stream metadata, or configuration (which is then added as stream metadata).
+  const bool is_secure = cluster_.info()
+                             ->transportSocketMatcher()
+                             .resolve(nullptr)
+                             .factory_.implementsSecureTransport();
+  uint32_t port = is_secure ? 443 : 80;
+  if (context->downstreamConnection()) {
+    const StreamInfo::UInt32Accessor* dynamic_port_filter_state =
+        context->downstreamConnection()
+            ->streamInfo()
+            .filterState()
+            .getDataReadOnly<StreamInfo::UInt32Accessor>("envoy.upstream.dynamic_port");
+    if (dynamic_port_filter_state != nullptr && dynamic_port_filter_state->value() > 0 &&
+        dynamic_port_filter_state->value() <= 65535) {
+      port = dynamic_port_filter_state->value();
+    }
+  }
+
+  std::string host = Common::DynamicForwardProxy::DnsHostInfo::normalizeHostForDfp(raw_host, port);
+
   if (host.empty()) {
+    ENVOY_LOG(debug, "host empty");
     return nullptr;
   }
 
@@ -343,9 +365,11 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
     absl::ReaderMutexLock lock{&cluster_.host_map_lock_};
     const auto host_it = cluster_.host_map_.find(host);
     if (host_it == cluster_.host_map_.end()) {
+      ENVOY_LOG(debug, "host {} not found", host);
       return nullptr;
     } else {
       if (host_it->second.logical_host_->coarseHealth() == Upstream::Host::Health::Unhealthy) {
+        ENVOY_LOG(debug, "host {} is unhealthy", host);
         return nullptr;
       }
       host_it->second.shared_host_info_->touch();
@@ -420,7 +444,7 @@ void Cluster::LoadBalancer::onConnectionDraining(Envoy::Http::ConnectionPool::In
       connection_info_map_[key].end());
 }
 
-std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>
+absl::StatusOr<std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>>
 ClusterFactory::createClusterWithConfig(
     const envoy::config::cluster::v3::Cluster& cluster,
     const envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig& proto_config,
@@ -447,8 +471,8 @@ ClusterFactory::createClusterWithConfig(
     cluster_config.mutable_upstream_http_protocol_options()->set_auto_san_validation(true);
   }
 
-  auto new_cluster =
-      std::make_shared<Cluster>(cluster_config, proto_config, context, cache_manager_factory);
+  auto new_cluster = std::shared_ptr<Cluster>(
+      new Cluster(cluster_config, proto_config, context, cache_manager_factory));
 
   Extensions::Common::DynamicForwardProxy::DFPClusterStoreFactory cluster_store_factory(
       factory_context_base);
@@ -459,10 +483,16 @@ ClusterFactory::createClusterWithConfig(
   if (!proto_config.allow_insecure_cluster_options()) {
     if (!options.has_value() ||
         (!options.value().auto_sni() || !options.value().auto_san_validation())) {
-      throw EnvoyException(
+      return absl::InvalidArgumentError(
           "dynamic_forward_proxy cluster must have auto_sni and auto_san_validation true unless "
           "allow_insecure_cluster_options is set.");
     }
+  }
+  if (proto_config.has_sub_clusters_config() &&
+      proto_config.sub_clusters_config().lb_policy() ==
+          envoy::config::cluster::v3::Cluster_LbPolicy::Cluster_LbPolicy_CLUSTER_PROVIDED) {
+    return absl::InvalidArgumentError(
+        "unsupported lb_policy 'CLUSTER_PROVIDED' in sub_cluster_config");
   }
 
   auto lb = std::make_unique<Cluster::ThreadAwareLoadBalancer>(*new_cluster);
