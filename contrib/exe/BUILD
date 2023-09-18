@@ -23,7 +23,7 @@ alias(
 envoy_cc_binary(
     name = "envoy-static",
     stamped = True,
-    deps = ["//source/exe:envoy_main_entry_lib"] + envoy_all_contrib_extensions(),
+    deps = ["//source/exe:envoy_main_entry_lib"] + envoy_all_contrib_extensions(ARM64_SKIP_CONTRIB_TARGETS),
 )
 
 envoy_cc_test(

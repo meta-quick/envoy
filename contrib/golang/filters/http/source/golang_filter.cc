@@ -179,6 +179,10 @@ Http::FilterTrailersStatus Filter::encodeTrailers(Http::ResponseTrailerMap& trai
 void Filter::onDestroy() {
   ENVOY_LOG(debug, "golang filter on destroy");
 
+  if(nullptr == req_){
+    return;
+  }
+
   {
     Thread::LockGuard lock(mutex_);
     if (has_destroyed_) {
@@ -188,7 +192,7 @@ void Filter::onDestroy() {
     has_destroyed_ = true;
   }
 
-  ASSERT(req_ != nullptr);
+  // ASSERT(req_ != nullptr);
   auto& state = getProcessorState();
   auto reason = state.isProcessingInGo() ? DestroyReason::Terminate : DestroyReason::Normal;
 
@@ -253,6 +257,7 @@ bool Filter::doDataGo(ProcessorState& state, Buffer::Instance& data, bool end_st
   Buffer::Instance& buffer = state.doDataList.push(data);
 
   ASSERT(req_ != nullptr);
+
   req_->phase = static_cast<int>(state.phase());
   auto status = dynamic_lib_->envoyGoFilterOnHttpData(
       req_, end_stream ? 1 : 0, reinterpret_cast<uint64_t>(&buffer), buffer.length());

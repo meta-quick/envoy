@@ -181,6 +181,7 @@ configure_make(
     env = {
         "CXXFLAGS": "-fPIC",
         "CFLAGS": "-fPIC",
+        "AR": "ar -r",
         "ICU_DATA_FILTER_FILE": "$(execpath //bazel/foreign_cc:icu_data_filter.json)",
     },
     lib_source = "@com_github_unicode_org_icu//:all",

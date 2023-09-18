@@ -13,6 +13,7 @@ ARM64_SKIP_CONTRIB_TARGETS = [
     "envoy.matching.input_matchers.hyperscan",
     "envoy.network.connection_balance.dlb",
     "envoy.regex_engines.hyperscan",
+    "envoy.bootstrap.vcl"
 ]
 PPC_SKIP_CONTRIB_TARGETS = [
     "envoy.tls.key_providers.cryptomb",
