@@ -23,6 +23,9 @@ build --platform_mappings=bazel/platform_mappings
 build --copt=-DABSL_MIN_LOG_LEVEL=4
 build --experimental_repository_downloader_retries=2
 
+build --remote_cache=http://192.168.11.201:28080
+build --remote_upload_local_results=true
+
 # Pass PATH, CC, CXX and LLVM_CONFIG variables from the environment.
 build --action_env=CC --host_action_env=CC
 build --action_env=CXX --host_action_env=CXX

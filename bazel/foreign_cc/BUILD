@@ -160,6 +160,7 @@ configure_make(
 # ICU used by the language detection filter (i18n).
 # Generates a minimal configuration and reduces the size of the ICU locale data filter file.
 # https://unicode-org.github.io/icu/userguide/icu_data/buildtool.html
+# on Mac, please add env: "AR": "ar -r",
 configure_make(
     name = "unicode_icu_build",
     build_data = ["//bazel/foreign_cc:icu_data_filter.json"],
@@ -181,7 +182,6 @@ configure_make(
     env = {
         "CXXFLAGS": "-fPIC",
         "CFLAGS": "-fPIC",
-        "AR": "ar -r",
         "ICU_DATA_FILTER_FILE": "$(execpath //bazel/foreign_cc:icu_data_filter.json)",
     },
     lib_source = "@com_github_unicode_org_icu//:all",

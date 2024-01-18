@@ -179,10 +179,6 @@ Http::FilterTrailersStatus Filter::encodeTrailers(Http::ResponseTrailerMap& trai
 void Filter::onDestroy() {
   ENVOY_LOG(debug, "golang filter on destroy");
 
-  if(nullptr == req_){
-    return;
-  }
-
   {
     Thread::LockGuard lock(mutex_);
     if (has_destroyed_) {
@@ -190,6 +186,10 @@ void Filter::onDestroy() {
       return;
     }
     has_destroyed_ = true;
+  }
+  
+  if(nullptr == req_){
+    return;
   }
 
   // ASSERT(req_ != nullptr);
