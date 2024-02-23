@@ -1,0 +1,11 @@
+FROM 192.168.11.201:1881/datasafe/gateway-arm64:v1.25.3
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get -qq update && apt-get -qq upgrade -y \
+    && apt-get -qq install --no-install-recommends -y ca-certificates pkg-config libxml2 libxml2-dev tzdata gcc \
+    && apt-get -qq autoremove -y && apt-get clean \
+    && rm -rf /tmp/* /var/tmp/* \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV TZ="Asia/Shanghai"
